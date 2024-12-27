@@ -1,11 +1,11 @@
-'use client'
+"use client";
 
-import { motion } from 'framer-motion'
-import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <motion.nav
@@ -16,15 +16,15 @@ export function Navigation() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <motion.a
-            href="#"
+            href="/"
             whileHover={{ scale: 1.05 }}
             className="text-xl font-bold font-mono"
           >
-            <span className="text-primary">&gt;_</span> Portfolio
+            <span className="text-primary">&gt;_</span> Bran's Portfolio
           </motion.a>
-          
+
           <div className="hidden md:flex items-center gap-8">
-            {['Projects', 'About', 'Contact'].map((item) => (
+            {["Projects", "About", "Contact"].map((item) => (
               <motion.a
                 key={item}
                 href={`#${item.toLowerCase()}`}
@@ -36,10 +36,8 @@ export function Navigation() {
             ))}
           </div>
 
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden"
-          >
+          {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
+          <button onClick={() => setIsOpen(!isOpen)} className="md:hidden">
             {isOpen ? <X /> : <Menu />}
           </button>
         </div>
@@ -52,7 +50,7 @@ export function Navigation() {
           exit={{ opacity: 0 }}
           className="md:hidden px-4 py-4 border-t"
         >
-          {['Projects', 'About', 'Contact'].map((item) => (
+          {["Projects", "About", "Contact"].map((item) => (
             <a
               key={item}
               href={`#${item.toLowerCase()}`}
@@ -65,6 +63,5 @@ export function Navigation() {
         </motion.div>
       )}
     </motion.nav>
-  )
+  );
 }
-
