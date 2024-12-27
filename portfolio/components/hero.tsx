@@ -18,7 +18,7 @@ export function Hero() {
           transition={{ duration: 0.5 }}
           className="text-center"
         >
-          <div className="my-8">
+          <div className="my-16 md:my-8">
             <img 
               src="https://avatars.githubusercontent.com/u/31634868?v=4" 
               alt="Brandon Fernández"
