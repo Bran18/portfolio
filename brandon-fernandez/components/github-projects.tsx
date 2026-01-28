@@ -14,6 +14,7 @@ interface GitHubRepo {
   url: string
   stars: number
   language: string | null
+  languages?: string[] // Array of languages from GitHub
 }
 
 const FEATURED_PROJECTS: GitHubRepo[] = [
@@ -31,7 +32,7 @@ const FEATURED_PROJECTS: GitHubRepo[] = [
     description: "DeFi protocol focused on charitable giving and community-driven finance",
     url: "https://github.com/kindfi-org/kindfi",
     stars: 0,
-    language: "Solidity",
+    language: "Rust",
   },
   {
     id: 3,
@@ -47,7 +48,7 @@ const FEATURED_PROJECTS: GitHubRepo[] = [
     description: "Substrate-based ecosystem hub for building and managing Polkadot parachains",
     url: "https://github.com/lober-org/polkahub",
     stars: 0,
-    language: "Rust",
+    language: "Solidity",
   },
   {
     id: 5,
@@ -63,7 +64,7 @@ const FEATURED_PROJECTS: GitHubRepo[] = [
     description: "AI-powered bot framework for autonomous agents and intelligent automation",
     url: "https://github.com/bitcashorg/masterbots",
     stars: 0,
-    language: "Python",
+    language: "Next.js",
   },
   {
     id: 7,
@@ -91,15 +92,102 @@ const FEATURED_PROJECTS: GitHubRepo[] = [
   },
 ]
 
+// Helper function to extract owner/repo from GitHub URL
+function extractGitHubRepo(url: string): { owner: string; repo: string } | null {
+  try {
+    const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+    if (match) {
+      return { owner: match[1], repo: match[2] }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// Fetch repository data (stars and languages) from GitHub API
+async function fetchRepoData(url: string): Promise<{ stars: number; languages: string[] }> {
+  const repoInfo = extractGitHubRepo(url)
+  if (!repoInfo) return { stars: 0, languages: [] }
+
+  try {
+    // Fetch repository info
+    const repoResponse = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}`)
+    if (!repoResponse.ok) return { stars: 0, languages: [] }
+    const repoData = await repoResponse.json()
+
+    // Fetch languages
+    let languages: string[] = []
+    try {
+      const languagesResponse = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/languages`)
+      if (languagesResponse.ok) {
+        const languagesData = await languagesResponse.json()
+        // Sort languages by byte count (descending) and get top 3
+        const sortedLanguages = Object.entries(languagesData)
+          .sort(([, a], [, b]) => (b as number) - (a as number))
+          .slice(0, 3)
+          .map(([lang]) => lang)
+        languages = sortedLanguages
+      }
+    } catch (error) {
+      console.error(`Failed to fetch languages for ${url}:`, error)
+      // Fallback to primary language if languages endpoint fails
+      if (repoData.language) {
+        languages = [repoData.language]
+      }
+    }
+
+    return {
+      stars: repoData.stargazers_count || 0,
+      languages,
+    }
+  } catch (error) {
+    console.error(`Failed to fetch repo data for ${url}:`, error)
+    return { stars: 0, languages: [] }
+  }
+}
+
 export function GitHubProjects() {
   const sectionRef = useRef<HTMLElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [projects, setProjects] = useState<GitHubRepo[]>(FEATURED_PROJECTS)
 
   useEffect(() => {
-    setLoading(false)
+    async function loadRepos() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const updatedProjects = await Promise.all(
+          FEATURED_PROJECTS.map(async (project) => {
+            // Only fetch data for GitHub URLs
+            if (project.url.includes("github.com")) {
+              const { stars, languages } = await fetchRepoData(project.url)
+              return {
+                ...project,
+                stars,
+                // Use API languages if available, otherwise fallback to hardcoded language
+                languages: languages.length > 0 ? languages : (project.language ? [project.language] : []),
+                // Keep language for backward compatibility (use first language or fallback)
+                language: languages.length > 0 ? languages[0] : project.language,
+              }
+            }
+            return project
+          })
+        )
+        setProjects(updatedProjects)
+      } catch (err) {
+        setError("Failed to fetch repository data")
+        console.error("Error fetching repository data:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadRepos()
   }, [])
 
   useEffect(() => {
@@ -142,7 +230,7 @@ export function GitHubProjects() {
     }, sectionRef)
 
     return () => ctx.revert()
-  }, [FEATURED_PROJECTS])
+  }, [])
 
   return (
     <section ref={sectionRef} id="projects" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
@@ -167,12 +255,12 @@ export function GitHubProjects() {
           <div className="col-span-full py-12 text-center">
             <p className="font-mono text-sm text-muted-foreground">{error}</p>
           </div>
-        ) : FEATURED_PROJECTS.length === 0 ? (
+        ) : projects.length === 0 ? (
           <div className="col-span-full py-12 text-center">
             <p className="font-mono text-sm text-muted-foreground">No projects found</p>
           </div>
         ) : (
-          FEATURED_PROJECTS.map((project) => <ProjectCard key={project.id} repo={project} />)
+          projects.map((project) => <ProjectCard key={project.id} repo={project} />)
         )}
       </div>
 
@@ -185,7 +273,8 @@ export function GitHubProjects() {
           className="group inline-flex items-center gap-3 border border-foreground/20 px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
         >
           View All Projects
-          <svg
+          {/* biome-ignore lint/a11y/noSvgWithoutTitle: <explanation> */}
+            <svg
             className="w-4 h-4 transition-transform group-hover:translate-x-1"
             fill="none"
             viewBox="0 0 24 24"
@@ -222,9 +311,13 @@ function ProjectCard({ repo }: { repo: GitHubRepo }) {
 
       {/* Content */}
       <div className="relative z-10">
-        {repo.language && (
+        {repo.languages && repo.languages.length > 0 ? (
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            {repo.languages.join(" / ")}
+          </span>
+        ) : repo.language ? (
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{repo.language}</span>
-        )}
+        ) : null}
         <h3
           className={cn(
             "mt-2 font-[var(--font-bebas)] text-2xl tracking-tight transition-colors duration-300 break-words",
@@ -247,6 +340,7 @@ function ProjectCard({ repo }: { repo: GitHubRepo }) {
       {/* Footer with stars and link */}
       <div className="relative z-10 mt-4 flex items-center justify-between pt-4 border-t border-border/30">
         <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+          {/* biome-ignore lint/a11y/noSvgWithoutTitle: <explanation> */}
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2l-2.81 6.63L2 9.24l5.46 4.73L5.82 21 12 17.27z" />
           </svg>
